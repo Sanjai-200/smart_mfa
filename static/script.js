@@ -5,7 +5,7 @@ import {
   signInWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 // ROUTES
 window.goSignup = () => window.location = "/signup";
@@ -77,7 +77,6 @@ window.login = async () => {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
 
-  // 🔥 per-user failedAttempts
   let failedAttempts = parseInt(localStorage.getItem(email + "_failedAttempts")) || 0;
 
   try {
@@ -91,9 +90,6 @@ window.login = async () => {
     const time = new Date().toLocaleTimeString();
 
     const { db } = await import("/static/firebase.js");
-    const { doc, getDoc } = await import(
-      "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js"
-    );
 
     const ref = doc(db, "activity", userCred.user.uid);
     const snap = await getDoc(ref);
@@ -103,8 +99,7 @@ window.login = async () => {
       loginCount = (snap.data().loginCount || 0) + 1;
     }
 
-    // 🔥 ML fallback protection
-    let result = { prediction: 0 };
+    let prediction = 0;
 
     try {
       const response = await fetch("/predict", {
@@ -119,24 +114,17 @@ window.login = async () => {
         })
       });
 
-      result = await response.json();
+      const data = await response.json();
+      if (typeof data.prediction === "number") {
+        prediction = data.prediction;
+      }
 
-    } catch (e) {
-      console.log("ML failed → fallback safe login", e);
+    } catch {
+      console.log("ML failed → SAFE fallback");
     }
 
-    // ✅ SAFE LOGIN
-    if (result.prediction === 0) {
-
-      await storeData(failedAttempts);
-
-      localStorage.setItem(email + "_failedAttempts", 0);
-
-      window.location = "/home";
-
-    } 
-    // ⚠️ RISK LOGIN
-    else {
+    // 🔥 FINAL DECISION
+    if (prediction === 1) {
 
       localStorage.setItem(email + "_finalFailedAttempts", failedAttempts);
 
@@ -155,13 +143,19 @@ window.login = async () => {
       });
 
       alert("OTP sent to your email 📧");
-
       window.location = "/otp";
+
+    } else {
+
+      await storeData(failedAttempts);
+
+      localStorage.setItem(email + "_failedAttempts", 0);
+
+      window.location = "/home";
     }
 
   } catch (e) {
 
-    // 🔥 specific error handling
     if (e.code === "auth/user-not-found") {
       document.getElementById("msg").innerText = "User not found ❌";
       return;
@@ -176,16 +170,6 @@ window.login = async () => {
       return;
     }
 
-    if (e.code === "auth/invalid-email") {
-      document.getElementById("msg").innerText = "Invalid email format ❌";
-      return;
-    }
-
-    // fallback
-    failedAttempts++;
-    localStorage.setItem(email + "_failedAttempts", failedAttempts);
-
-    document.getElementById("msg").innerText =
-      "Login failed ❌ (" + failedAttempts + ")";
+    document.getElementById("msg").innerText = "Login failed ❌";
   }
 };
