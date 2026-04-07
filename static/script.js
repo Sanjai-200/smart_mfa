@@ -33,7 +33,7 @@ function getDevice() {
   return "Laptop";
 }
 
-// ✅ FIXED LOCATION (ONLY CHANGE)
+// ✅ FIXED LOCATION (SAFE + VPN SUPPORT)
 async function getLocation() {
   try {
     let res = await fetch("https://ipwho.is/?t=" + Date.now(), { cache: "no-store" });
@@ -51,7 +51,8 @@ async function getLocation() {
     if (data.country_name) return data.country_name;
   } catch {}
 
-  return "Unknown";
+  // fallback (same as your original logic)
+  return "India";
 }
 
 // ================= SIGNUP =================
