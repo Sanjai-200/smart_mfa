@@ -14,7 +14,12 @@ with open("model.pkl", "rb") as f:
 # ================= EMAIL FUNCTION =================
 def send_email(to_email, otp):
     sender = "smart7mfa@gmail.com"
-    password = "xmsfegbbvfiywbo"   # 🔥 no spaces
+    password = "xmsfegbbvfiywbo"   # no spaces
+
+    print("\n================ OTP DEBUG ================")
+    print("📨 Sending OTP to:", to_email)
+    print("🔐 OTP:", otp)
+    print("==========================================\n")
 
     msg = MIMEText(f"Your OTP is: {otp}")
     msg["Subject"] = "OTP Verification"
@@ -23,13 +28,18 @@ def send_email(to_email, otp):
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.ehlo()
         server.starttls()
+        server.ehlo()
+
         server.login(sender, password)
-        server.send_message(msg)
+        server.sendmail(sender, to_email, msg.as_string())
+
         server.quit()
-        print("Email sent ✅")
+        print("✅ Email sent successfully")
+
     except Exception as e:
-        print("Email error:", e)
+        print("❌ Email error:", e)
 
 # ================= ROUTES =================
 @app.route("/")
@@ -59,7 +69,7 @@ def send_otp():
 
     return jsonify({"status": "sent"})
 
-# ================= SAFE PARSERS =================
+# ================= HELPERS =================
 def safe_int(value, default=0):
     try:
         return int(value)
@@ -89,22 +99,13 @@ def parse_location(location):
         return 0
 
     loc = str(location).strip().lower()
-
-    if loc in ["india", "unknown", ""]:
-        return 0
-
-    return 1
+    return 0 if loc in ["india", "unknown", ""] else 1
 
 def parse_device(device):
     if not device:
         return 0
 
-    dev = str(device).lower()
-
-    if "mobile" in dev:
-        return 1
-
-    return 0
+    return 1 if "mobile" in str(device).lower() else 0
 
 # ================= ENCODE =================
 def encode(data):
