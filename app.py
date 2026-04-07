@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
-import os
 
 app = Flask(__name__)
 
@@ -14,8 +13,8 @@ with open("model.pkl", "rb") as f:
 
 # ================= EMAIL FUNCTION =================
 def send_email(to_email, otp):
-    sender = "your_email@gmail.com"   # 🔥 CHANGE THIS
-    password = "your_app_password"    # 🔥 PASTE APP PASSWORD (no spaces)
+    sender = "smart7mfa@gmail.com"
+    password = "xmsfegbbvfiywbo"   # 🔥 no spaces
 
     msg = MIMEText(f"Your OTP is: {otp}")
     msg["Subject"] = "OTP Verification"
@@ -70,8 +69,6 @@ def safe_int(value, default=0):
 def parse_time(time_str):
     if not time_str:
         return 12
-
-    time_str = str(time_str).strip()
 
     try:
         if ":" in time_str and "AM" not in time_str and "PM" not in time_str:
@@ -130,11 +127,9 @@ def predict():
     data = request.json
 
     input_data = encode(data)
-
     pred = model.predict(input_data)[0]
 
     print("RAW INPUT:", data)
-    print("PROCESSED:", input_data.to_dict())
     print("PREDICTION:", pred)
 
     return jsonify({"prediction": int(pred)})
