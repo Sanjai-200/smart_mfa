@@ -77,7 +77,8 @@ window.login = async () => {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
 
-  let failedAttempts = parseInt(localStorage.getItem("failedAttempts")) || 0;
+  // 🔥 per-user failedAttempts
+  let failedAttempts = parseInt(localStorage.getItem(email + "_failedAttempts")) || 0;
 
   try {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
@@ -102,11 +103,10 @@ window.login = async () => {
       loginCount = (snap.data().loginCount || 0) + 1;
     }
 
-    // 🔥 SAFE DEFAULT (IMPORTANT FIX)
+    // 🔥 ML fallback protection
     let result = { prediction: 0 };
 
     try {
-      // ML CALL
       const response = await fetch("/predict", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -122,7 +122,7 @@ window.login = async () => {
       result = await response.json();
 
     } catch (e) {
-      console.log("ML API failed → fallback to safe login", e);
+      console.log("ML failed → fallback safe login", e);
     }
 
     // ✅ SAFE LOGIN
@@ -130,14 +130,15 @@ window.login = async () => {
 
       await storeData(failedAttempts);
 
-      localStorage.setItem("failedAttempts", 0);
+      localStorage.setItem(email + "_failedAttempts", 0);
+
       window.location = "/home";
 
     } 
     // ⚠️ RISK LOGIN
     else {
 
-      localStorage.setItem("finalFailedAttempts", failedAttempts);
+      localStorage.setItem(email + "_finalFailedAttempts", failedAttempts);
 
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -159,8 +160,30 @@ window.login = async () => {
     }
 
   } catch (e) {
+
+    // 🔥 specific error handling
+    if (e.code === "auth/user-not-found") {
+      document.getElementById("msg").innerText = "User not found ❌";
+      return;
+    }
+
+    if (e.code === "auth/wrong-password") {
+      failedAttempts++;
+      localStorage.setItem(email + "_failedAttempts", failedAttempts);
+
+      document.getElementById("msg").innerText =
+        "Wrong password ❌ (" + failedAttempts + ")";
+      return;
+    }
+
+    if (e.code === "auth/invalid-email") {
+      document.getElementById("msg").innerText = "Invalid email format ❌";
+      return;
+    }
+
+    // fallback
     failedAttempts++;
-    localStorage.setItem("failedAttempts", failedAttempts);
+    localStorage.setItem(email + "_failedAttempts", failedAttempts);
 
     document.getElementById("msg").innerText =
       "Login failed ❌ (" + failedAttempts + ")";
