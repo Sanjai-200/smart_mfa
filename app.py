@@ -14,7 +14,7 @@ with open("model.pkl", "rb") as f:
 # ================= EMAIL FUNCTION =================
 def send_email(to_email, otp):
     sender = "smart7mfa@gmail.com"
-    password = "xmsfegbbvfiywbo"   # no spaces
+    password = "rnokxuzddimxpgob"   # no spaces
 
     print("\n================ OTP DEBUG ================")
     print("📨 Sending OTP to:", to_email)
