@@ -24,55 +24,26 @@ function getDevice() {
 // ================= LOCATION (VPN-proof, 4-API chain) =================
 // Each API returns the VPN EXIT country when a VPN is active.
 async function getLocation() {
-
-  // API 1: ipapi.co — very reliable, no CORS issues
+  // Method 1: ipify → ipapi.co (most reliable with VPN)
   try {
-    const res  = await fetch("https://ipapi.co/json/", {
-      headers: { "Accept": "application/json" },
-      cache:   "no-store"
-    });
-    const data = await res.json();
-    if (data.country_name && data.country_name !== "None") {
-      console.log("Location from ipapi.co:", data.country_name);
-      return data.country_name;
-    }
+    const ipRes  = await fetch("https://api.ipify.org?format=json");
+    const ipData = await ipRes.json();
+    const res    = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
+    const data   = await res.json();
+    if (data.country_name) return data.country_name;
   } catch {}
 
-  // API 2: ip-api.com — returns VPN server location
-  try {
-    const res  = await fetch("https://ip-api.com/json/?fields=status,country", {
-      cache: "no-store"
-    });
-    const data = await res.json();
-    if (data.status === "success" && data.country) {
-      console.log("Location from ip-api.com:", data.country);
-      return data.country;
-    }
-  } catch {}
-
-  // API 3: ipwho.is — fallback
+  // Method 2: ipwho.is fallback
   try {
     const res  = await fetch("https://ipwho.is/", { cache: "no-store" });
     const data = await res.json();
-    if (data.success && data.country) {
-      console.log("Location from ipwho.is:", data.country);
-      return data.country;
-    }
+    if (data.success && data.country) return data.country;
   } catch {}
 
-  // API 4: freeipapi.com — last resort
-  try {
-    const res  = await fetch("https://freeipapi.com/api/json", { cache: "no-store" });
-    const data = await res.json();
-    if (data.countryName) {
-      console.log("Location from freeipapi:", data.countryName);
-      return data.countryName;
-    }
-  } catch {}
-
-  console.warn("All location APIs failed, returning Unknown");
-  return "Unknown";
+  return "Unknown"; // ← NOT "India", so ML treats it as foreign = risky
 }
+    
+  
 
 // ================= SIGNUP =================
 window.signup = async () => {
