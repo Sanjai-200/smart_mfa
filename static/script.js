@@ -42,8 +42,7 @@ async function getLocation() {
 
   return "Unknown"; // ← NOT "India", so ML treats it as foreign = risky
 }
-    
-  
+
 
 // ================= SIGNUP =================
 window.signup = async () => {
@@ -68,7 +67,8 @@ window.login = async () => {
   const password = document.getElementById("password").value;
 
   // Read current session failed attempts BEFORE attempting login
-  let failedAttempts = parseInt(localStorage.getItem(email + "_failedAttempts")) || 0;
+  // ✅ CHANGED: localStorage → sessionStorage (auto-clears when browser/tab closes)
+  let failedAttempts = parseInt(sessionStorage.getItem(email + "_failedAttempts")) || 0;
 
   // ── STEP 1: Authenticate with Firebase ──────────────────────────────────
   // Separate try/catch ONLY for auth — so wrong password is the ONLY
@@ -79,7 +79,8 @@ window.login = async () => {
   } catch (authError) {
     // ✅ Password was actually wrong — increment
     failedAttempts++;
-    localStorage.setItem(email + "_failedAttempts", failedAttempts);
+    // ✅ CHANGED: localStorage → sessionStorage
+    sessionStorage.setItem(email + "_failedAttempts", failedAttempts);
     document.getElementById("msg").innerText = "Login failed ❌ (" + failedAttempts + ")";
     return; // stop — don't run any post-login code
   }
@@ -88,7 +89,8 @@ window.login = async () => {
   // Save snapshot of how many failed attempts happened this session
   const sessionFailedAttempts = failedAttempts;
   // Reset RIGHT NOW so even if anything below errors, it won't keep climbing
-  localStorage.setItem(email + "_failedAttempts", 0);
+  // ✅ CHANGED: localStorage → sessionStorage
+  sessionStorage.setItem(email + "_failedAttempts", 0);
 
   // Store identity for otp.js
   localStorage.setItem("email", userCred.user.email);
