@@ -101,21 +101,19 @@ window.login = async () => {
     return;
   }
 
-  // ── STEP 2: Auth succeeded ───────────────────────────────────────────────
-  // Check localStorage for failed attempts saved before refresh
-  // This ensures the real count is fed to ML and stored in Firestore
+ 
   const pendingFailed = parseInt(localStorage.getItem(email + "_pendingFailed")) || 0;
   const sessionFailedAttempts = pendingFailed > 0 ? pendingFailed : failedAttempts;
 
-  // Clear both storages — fresh start for next session
+ 
   sessionStorage.setItem(email + "_failedAttempts", 0);
   localStorage.removeItem(email + "_pendingFailed");
 
-  // Store identity for otp.js
+  
   localStorage.setItem("email", userCred.user.email);
   localStorage.setItem("uid",   userCred.user.uid);
 
-  // ── STEP 3: Collect context ──────────────────────────────────────────────
+  
   msgEl.innerText = "Getting location...";
   let device   = getDevice();
   let location = "Unknown";
@@ -126,7 +124,7 @@ window.login = async () => {
     time     = new Date().toLocaleTimeString();
   } catch {}
 
-  // ── STEP 4: loginCount from Firestore ───────────────────────────────────
+  
   msgEl.innerText = "Loading profile...";
   let loginCount = 1;
   try {
@@ -136,14 +134,14 @@ window.login = async () => {
     loginCount   = snap.exists() ? (snap.data().loginCount || 0) + 1 : 1;
   } catch {}
 
-  // Save pending data for otp.js to use after OTP verification
+  
   localStorage.setItem("pendingDevice",         device);
   localStorage.setItem("pendingLocation",       location);
   localStorage.setItem("pendingTime",           time);
   localStorage.setItem("pendingLoginCount",     loginCount);
   localStorage.setItem("pendingFailedAttempts", sessionFailedAttempts);
 
-  // ── STEP 5: ML Prediction ────────────────────────────────────────────────
+
   msgEl.innerText = "Analysing risk...";
   let prediction = 0;
   try {
@@ -154,7 +152,7 @@ window.login = async () => {
         device,
         location,
         loginCount,
-        failedAttempts: sessionFailedAttempts,  // ✅ real count fed to ML
+        failedAttempts: sessionFailedAttempts,  
         time
       })
     });
@@ -168,14 +166,14 @@ window.login = async () => {
     return;
   }
 
-  // ── STEP 6: Route based on prediction ───────────────────────────────────
+  
   msgEl.innerText = " Prediction: " + prediction +
     (prediction === 0 ? " → Going Home..." : " → Sending OTP...");
 
   setTimeout(async () => {
 
     if (prediction === 0) {
-      // SAFE — store activity and go home
+      
       try {
         const { db } = await import("/static/firebase.js");
         const ref    = doc(db, "activity", userCred.user.uid);
@@ -186,14 +184,14 @@ window.login = async () => {
           date:           new Date().toISOString().split("T")[0],
           time,
           loginCount,
-          failedAttempts: sessionFailedAttempts  // ✅ real count stored in Firestore
+          failedAttempts: sessionFailedAttempts  
         });
       } catch {}
 
       window.location = "/home";
 
     } else {
-      // RISKY — send OTP
+      
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       localStorage.setItem("otp",     otp);
       localStorage.setItem("otpTime", Date.now());
