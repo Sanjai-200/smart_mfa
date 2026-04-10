@@ -7,16 +7,15 @@ from email.mime.text import MIMEText
 
 app = Flask(__name__)
 
-# ================= EMAIL CONFIG =================
 EMAIL_SENDER   = "smart7mfa@gmail.com"
-EMAIL_PASSWORD = "qbfq ujgg pnpo ikrc"   # Gmail App Password (no spaces needed but works either way)
+EMAIL_PASSWORD = "qbfq ujgg pnpo ikrc"   
 
-# LOAD MODEL
+
 with open("model.pkl", "rb") as f:
     model = pickle.load(f)
 
 
-# ================= ROUTES =================
+
 @app.route("/")
 def login():
     return render_template("index.html")
@@ -34,7 +33,7 @@ def home():
     return render_template("home.html")
 
 
-# ================= EMAIL =================
+
 def send_email(receiver, otp):
     if not receiver or not otp:
         print("❌ Email Error: Missing receiver or OTP")
@@ -77,7 +76,7 @@ def send_otp():
     return jsonify({"status": "sent" if success else "failed"})
 
 
-# ================= PARSERS =================
+
 def safe_int(value, default=0):
     try:
         return int(value)
@@ -112,7 +111,7 @@ def parse_device(device):
     return 0
 
 
-# ================= ENCODE =================
+
 def encode(data):
     device         = parse_device(data.get("device"))
     location       = parse_location(data.get("location"))
@@ -129,7 +128,7 @@ def encode(data):
     return df
 
 
-# ================= PREDICT =================
+
 @app.route("/predict", methods=["POST"])
 def predict():
     data       = request.json
@@ -142,6 +141,6 @@ def predict():
     return jsonify({"prediction": int(pred)})
 
 
-# RUN
+
 if __name__ == "__main__":
     app.run(debug=True)
