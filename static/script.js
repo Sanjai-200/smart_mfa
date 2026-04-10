@@ -172,7 +172,7 @@ window.login = async () => {
   }
 
   // ── STEP 6: Route based on prediction ───────────────────────────────────
-  msgEl.innerText = "✅ Auth OK | Prediction: " + prediction +
+  msgEl.innerText = " Prediction: " + prediction +
     (prediction === 0 ? " → Going Home..." : " → Sending OTP...");
 
   setTimeout(async () => {
