@@ -21,8 +21,7 @@ function getDevice() {
   return "Laptop";
 }
 
-// ================= LOCATION (VPN-proof, 4-API chain) =================
-// Each API returns the VPN EXIT country when a VPN is active.
+// ================= LOCATION =================
 async function getLocation() {
   // Method 1: ipify → ipapi.co (most reliable with VPN)
   try {
@@ -40,9 +39,8 @@ async function getLocation() {
     if (data.success && data.country) return data.country;
   } catch {}
 
-  return "Unknown"; // ← NOT "India", so ML treats it as foreign = risky
+  return "Unknown";
 }
-
 
 // ================= SIGNUP =================
 window.signup = async () => {
@@ -65,38 +63,63 @@ window.signup = async () => {
 window.login = async () => {
   const email    = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
+  const msgEl    = document.getElementById("msg");
 
-  // Read current session failed attempts BEFORE attempting login
-  // ✅ CHANGED: localStorage → sessionStorage (auto-clears when browser/tab closes)
+  // sessionStorage — clears when tab/browser closes (fresh each new visit)
   let failedAttempts = parseInt(sessionStorage.getItem(email + "_failedAttempts")) || 0;
 
-  // ── STEP 1: Authenticate with Firebase ──────────────────────────────────
-  // Separate try/catch ONLY for auth — so wrong password is the ONLY
-  // thing that ever increments failedAttempts.
+  // ── STEP 1: Firebase Auth only ──────────────────────────────────────────
+  msgEl.innerText = "Checking credentials...";
   let userCred;
   try {
     userCred = await signInWithEmailAndPassword(auth, email, password);
+
   } catch (authError) {
-    // ✅ Password was actually wrong — increment
+    const code = authError.code;
+
+    // Firebase itself blocked due to too many requests
+    if (code === "auth/too-many-requests") {
+      // Save current count to localStorage before reset
+      // so it survives the refresh and gets fed to ML
+      localStorage.setItem(email + "_pendingFailed", failedAttempts);
+      sessionStorage.setItem(email + "_failedAttempts", 0);
+      msgEl.innerText = "⚠️ Too many attempts. Please refresh the page and try again.";
+      return;
+    }
+
+    // Wrong password — increment
     failedAttempts++;
-    // ✅ CHANGED: localStorage → sessionStorage
     sessionStorage.setItem(email + "_failedAttempts", failedAttempts);
-    document.getElementById("msg").innerText = "Login failed ❌ (" + failedAttempts + ")";
-    return; // stop — don't run any post-login code
+
+    // Stop at 4 — before Firebase blocks at 5-6
+    // Save count to localStorage so it survives refresh
+    if (failedAttempts >= 4) {
+      localStorage.setItem(email + "_pendingFailed", failedAttempts);
+      sessionStorage.setItem(email + "_failedAttempts", 0);
+      msgEl.innerText = "⚠️ Too many attempts. Please refresh the page  & try again later .";
+      return;
+    }
+
+    msgEl.innerText = "Login failed ❌ (" + failedAttempts + ")";
+    return;
   }
 
-  // ── STEP 2: Auth succeeded — IMMEDIATELY reset failed attempts ───────────
-  // Save snapshot of how many failed attempts happened this session
-  const sessionFailedAttempts = failedAttempts;
-  // Reset RIGHT NOW so even if anything below errors, it won't keep climbing
-  // ✅ CHANGED: localStorage → sessionStorage
+  // ── STEP 2: Auth succeeded ───────────────────────────────────────────────
+  // Check localStorage for failed attempts saved before refresh
+  // This ensures the real count is fed to ML and stored in Firestore
+  const pendingFailed = parseInt(localStorage.getItem(email + "_pendingFailed")) || 0;
+  const sessionFailedAttempts = pendingFailed > 0 ? pendingFailed : failedAttempts;
+
+  // Clear both storages — fresh start for next session
   sessionStorage.setItem(email + "_failedAttempts", 0);
+  localStorage.removeItem(email + "_pendingFailed");
 
   // Store identity for otp.js
   localStorage.setItem("email", userCred.user.email);
   localStorage.setItem("uid",   userCred.user.uid);
 
-  // ── STEP 3: Collect context (non-critical, won't affect login flow) ──────
+  // ── STEP 3: Collect context ──────────────────────────────────────────────
+  msgEl.innerText = "Getting location...";
   let device   = getDevice();
   let location = "Unknown";
   let time     = new Date().toLocaleTimeString();
@@ -106,7 +129,8 @@ window.login = async () => {
     time     = new Date().toLocaleTimeString();
   } catch {}
 
-  // ── STEP 4: Get loginCount from Firestore ────────────────────────────────
+  // ── STEP 4: loginCount from Firestore ───────────────────────────────────
+  msgEl.innerText = "Loading profile...";
   let loginCount = 1;
   try {
     const { db } = await import("/static/firebase.js");
@@ -115,7 +139,7 @@ window.login = async () => {
     loginCount   = snap.exists() ? (snap.data().loginCount || 0) + 1 : 1;
   } catch {}
 
-  // Save all pending data for otp.js to use after OTP verification
+  // Save pending data for otp.js to use after OTP verification
   localStorage.setItem("pendingDevice",         device);
   localStorage.setItem("pendingLocation",       location);
   localStorage.setItem("pendingTime",           time);
@@ -123,7 +147,8 @@ window.login = async () => {
   localStorage.setItem("pendingFailedAttempts", sessionFailedAttempts);
 
   // ── STEP 5: ML Prediction ────────────────────────────────────────────────
-  let prediction = 0; // default to safe if /predict unreachable
+  msgEl.innerText = "Analysing risk...";
+  let prediction = 0;
   try {
     const res    = await fetch("/predict", {
       method:  "POST",
@@ -132,7 +157,7 @@ window.login = async () => {
         device,
         location,
         loginCount,
-        failedAttempts: sessionFailedAttempts,
+        failedAttempts: sessionFailedAttempts,  // ✅ real count fed to ML
         time
       })
     });
@@ -140,41 +165,52 @@ window.login = async () => {
     if (typeof result.prediction === "number") {
       prediction = result.prediction;
     }
-  } catch {}
+  } catch (e) {
+    msgEl.innerText = "⚠️ Predict error: " + e.message + " — redirecting...";
+    setTimeout(() => window.location = "/home", 3000);
+    return;
+  }
 
   // ── STEP 6: Route based on prediction ───────────────────────────────────
-  if (prediction === 0) {
-    // SAFE — save activity and go home
-    try {
-      const { db } = await import("/static/firebase.js");
-      const ref    = doc(db, "activity", userCred.user.uid);
-      await setDoc(ref, {
-        email,
-        location,
-        device,
-        date:           new Date().toISOString().split("T")[0],
-        time,
-        loginCount,
-        failedAttempts: sessionFailedAttempts  // overwrite with THIS session's count
-      });
-    } catch {}
+  msgEl.innerText = "✅ Auth OK | Prediction: " + prediction +
+    (prediction === 0 ? " → Going Home..." : " → Sending OTP...");
 
-    window.location = "/home";
+  setTimeout(async () => {
 
-  } else {
-    // RISKY — send OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    localStorage.setItem("otp",     otp);
-    localStorage.setItem("otpTime", Date.now());
+    if (prediction === 0) {
+      // SAFE — store activity and go home
+      try {
+        const { db } = await import("/static/firebase.js");
+        const ref    = doc(db, "activity", userCred.user.uid);
+        await setDoc(ref, {
+          email,
+          location,
+          device,
+          date:           new Date().toISOString().split("T")[0],
+          time,
+          loginCount,
+          failedAttempts: sessionFailedAttempts  // ✅ real count stored in Firestore
+        });
+      } catch {}
 
-    try {
-      await fetch("/send-otp", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email: userCred.user.email, otp })
-      });
-    } catch {}
+      window.location = "/home";
 
-    window.location = "/otp";
-  }
+    } else {
+      // RISKY — send OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      localStorage.setItem("otp",     otp);
+      localStorage.setItem("otpTime", Date.now());
+
+      try {
+        await fetch("/send-otp", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ email: userCred.user.email, otp })
+        });
+      } catch {}
+
+      window.location = "/otp";
+    }
+
+  }, 3000);
 };
