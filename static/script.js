@@ -7,11 +7,11 @@ import {
 
 import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-// ROUTES
+
 window.goSignup = () => window.location = "/signup";
 window.goLogin  = () => window.location = "/";
 
-// ================= DEVICE =================
+
 function getDevice() {
   if (
     navigator.userAgentData?.mobile ||
@@ -21,9 +21,9 @@ function getDevice() {
   return "Laptop";
 }
 
-// ================= LOCATION =================
+
 async function getLocation() {
-  // Method 1: ipify → ipapi.co (most reliable with VPN)
+  
   try {
     const ipRes  = await fetch("https://api.ipify.org?format=json");
     const ipData = await ipRes.json();
@@ -32,7 +32,7 @@ async function getLocation() {
     if (data.country_name) return data.country_name;
   } catch {}
 
-  // Method 2: ipwho.is fallback
+
   try {
     const res  = await fetch("https://ipwho.is/", { cache: "no-store" });
     const data = await res.json();
@@ -42,7 +42,7 @@ async function getLocation() {
   return "Unknown";
 }
 
-// ================= SIGNUP =================
+
 window.signup = async () => {
   const username = document.getElementById("username").value.trim();
   const email    = document.getElementById("email").value.trim();
@@ -59,16 +59,16 @@ window.signup = async () => {
   }
 };
 
-// ================= LOGIN =================
+
 window.login = async () => {
   const email    = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
   const msgEl    = document.getElementById("msg");
 
-  // sessionStorage — clears when tab/browser closes (fresh each new visit)
+  
   let failedAttempts = parseInt(sessionStorage.getItem(email + "_failedAttempts")) || 0;
 
-  // ── STEP 1: Firebase Auth only ──────────────────────────────────────────
+  
   msgEl.innerText = "Checking credentials...";
   let userCred;
   try {
@@ -77,22 +77,19 @@ window.login = async () => {
   } catch (authError) {
     const code = authError.code;
 
-    // Firebase itself blocked due to too many requests
+    
     if (code === "auth/too-many-requests") {
-      // Save current count to localStorage before reset
-      // so it survives the refresh and gets fed to ML
       localStorage.setItem(email + "_pendingFailed", failedAttempts);
       sessionStorage.setItem(email + "_failedAttempts", 0);
       msgEl.innerText = "⚠️ Too many attempts. Please refresh the page and try again.";
       return;
     }
 
-    // Wrong password — increment
+
     failedAttempts++;
     sessionStorage.setItem(email + "_failedAttempts", failedAttempts);
 
-    // Stop at 4 — before Firebase blocks at 5-6
-    // Save count to localStorage so it survives refresh
+
     if (failedAttempts >= 4) {
       localStorage.setItem(email + "_pendingFailed", failedAttempts);
       sessionStorage.setItem(email + "_failedAttempts", 0);
