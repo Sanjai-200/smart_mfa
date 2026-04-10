@@ -24,10 +24,11 @@ body {
   background:      var(--bg-gradient);
   min-height:      100vh;
   display:         flex;
-  align-items:     center;
+  align-items:     flex-start;        ← changed from center
   justify-content: center;
-  padding:         20px;
+  padding:         60px 20px;         ← changed from 20px
   color:           var(--text-dark);
+  background-attachment: fixed;       ← add this (fixes bg jumping too)
 }
 
 .box {
